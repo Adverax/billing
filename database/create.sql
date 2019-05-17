@@ -1,0 +1,6 @@
+
+DROP DATABASE IF EXISTS billing;
+CREATE DATABASE billing DEFAULT CHARACTER SET utf8;
+
+USE billing;
+SOURCE db.sql;

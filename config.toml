@@ -1,0 +1,9 @@
+[[database.node]]
+host = "127.0.0.1"
+port = 3306
+database = "billing"
+username = "root"
+password = "SqL314LqS"
+
+[broker]
+server = "nats://localhost:4222"
