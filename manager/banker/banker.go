@@ -10,6 +10,11 @@ type HistoryManager interface {
 	Append(ctx context.Context, uid int64, account uint32, amount float32, op domain.Operation) error
 }
 
+type AccountManager interface {
+	Credit(ctx context.Context, account uint32, amount float32) error
+	Debit(ctx context.Context, account uint32, amount float32) error
+}
+
 type AssetManager interface {
 	Append(ctx context.Context, uid int64, account uint32, amount float32) error
 	Remove(ctx context.Context, uid int64, account uint32) (amount float32, err error)
@@ -26,8 +31,9 @@ type Manager interface {
 
 type engine struct {
 	sql.Repository
-	assets  AssetManager
-	history HistoryManager
+	accounts AccountManager
+	assets   AssetManager
+	history  HistoryManager
 }
 
 func (engine *engine) Credit(
@@ -44,33 +50,7 @@ func (engine *engine) Credit(
 				return err
 			}
 
-			return engine.credit(ctx, account, amount)
-		},
-	)
-}
-
-func (engine *engine) credit(
-	ctx context.Context,
-	account uint32,
-	amount float32,
-) error {
-	return engine.Transaction(
-		ctx,
-		func(ctx context.Context, scope sql.Scope) error {
-			const query1 = "SELECT amount FROM account WHERE id = ? FOR UPDATE"
-			var sum float32
-			err := scope.QueryRow(query1, account).Scan(&sum)
-			if err != nil {
-				return err
-			}
-
-			if sum < amount {
-				return domain.ErrNoMoney
-			}
-
-			const query2 = "UPDATE account SET amount = ? WHERE id = ?"
-			_, err = scope.Exec(query2, sum-amount, account)
-			return err
+			return engine.accounts.Credit(ctx, account, amount)
 		},
 	)
 }
@@ -89,32 +69,9 @@ func (engine *engine) Debit(
 				return err
 			}
 
-			return engine.debit(ctx, account, amount)
+			return engine.accounts.Debit(ctx, account, amount)
 		},
 	)
-}
-
-func (engine *engine) debit(
-	ctx context.Context,
-	account uint32,
-	amount float32,
-) error {
-	const query = "UPDATE account SET amount = amount + ? WHERE id = ?"
-	res, err := engine.Scope(ctx).Exec(query, amount, account)
-	if err != nil {
-		return err
-	}
-
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rows == 0 {
-		return sql.ErrNoRows
-	}
-
-	return err
 }
 
 func (engine *engine) Transfer(
@@ -136,12 +93,12 @@ func (engine *engine) Transfer(
 				return err
 			}
 
-			err = engine.credit(ctx, src, amount)
+			err = engine.accounts.Credit(ctx, src, amount)
 			if err != nil {
 				return err
 			}
 
-			return engine.debit(ctx, dst, amount)
+			return engine.accounts.Debit(ctx, dst, amount)
 		},
 	)
 }
@@ -160,7 +117,7 @@ func (engine *engine) Acquire(
 				return err
 			}
 
-			err = engine.credit(ctx, account, amount)
+			err = engine.accounts.Credit(ctx, account, amount)
 			if err != nil {
 				return err
 			}
@@ -201,7 +158,7 @@ func (engine *engine) Rollback(
 				return err
 			}
 
-			err = engine.debit(ctx, account, amount)
+			err = engine.accounts.Debit(ctx, account, amount)
 			if err != nil {
 				return err
 			}
@@ -213,11 +170,13 @@ func (engine *engine) Rollback(
 
 func New(
 	db sql.DB,
+	accounts AccountManager,
 	assets AssetManager,
 	history HistoryManager,
 ) Manager {
 	return &engine{
 		Repository: sql.NewRepository(db),
+		accounts:   accounts,
 		assets:     assets,
 		history:    history,
 	}

@@ -1,4 +1,4 @@
-package banker
+package account
 
 import (
 	"billing/domain"
@@ -14,58 +14,8 @@ func setUp() (context.Context, sql.DB) {
 	return ctx, domain.Config.Database.DSC().OpenForTest(ctx)
 }
 
-type historyMock struct {
-	uid     int64
-	account uint32
-	amount  float32
-	op      domain.Operation
-}
-
-func (h *historyMock) Append(
-	ctx context.Context,
-	uid int64,
-	account uint32,
-	amount float32,
-	op domain.Operation,
-) error {
-	h.uid = uid
-	h.account = account
-	h.amount = amount
-	h.op = op
-	return nil
-}
-
-type assetMock struct {
-	uid     int64
-	account uint32
-	amount  float32
-}
-
-func (asset *assetMock) Append(
-	ctx context.Context,
-	uid int64,
-	account uint32,
-	amount float32,
-) error {
-	asset.uid = uid
-	asset.account = account
-	asset.amount = amount
-	return nil
-}
-
-func (asset *assetMock) Remove(
-	ctx context.Context,
-	uid int64,
-	account uint32,
-) (amount float32, err error) {
-	asset.uid = uid
-	asset.account = account
-	return asset.amount, nil
-}
-
 func TestEngine_Credit(t *testing.T) {
 	type Src struct {
-		uid     int64
 		account uint32
 		amount  float32
 		source  float32
@@ -84,7 +34,6 @@ func TestEngine_Credit(t *testing.T) {
 	tests := map[string]Test{
 		"Valid payment must be accepted": {
 			src: Src{
-				uid:     10,
 				account: 1,
 				amount:  50,
 				source:  100,
@@ -93,21 +42,8 @@ func TestEngine_Credit(t *testing.T) {
 				amount: 50,
 			},
 		},
-		"Invalid payment must be rejected": {
-			src: Src{
-				uid:     10,
-				account: 1,
-				amount:  500,
-				source:  100,
-			},
-			dst: Dst{
-				amount: 100,
-				err:    domain.ErrNoMoney,
-			},
-		},
 		"Invalid payer must be skipped": {
 			src: Src{
-				uid:     10,
 				account: 2,
 				amount:  50,
 				source:  100,
@@ -121,9 +57,7 @@ func TestEngine_Credit(t *testing.T) {
 	ctx, db := setUp()
 	defer db.Close(ctx)
 
-	assets := &assetMock{}
-	history := &historyMock{}
-	e := New(db, assets, history)
+	e := New(db)
 
 	const query = `
 DELETE FROM account;
@@ -136,7 +70,7 @@ INSERT INTO account SET id = 1;`
 			const query = "UPDATE account SET amount = ?"
 			_, err := db.Exec(query, test.src.source)
 			require.NoError(t, err)
-			err = e.Credit(ctx, test.src.uid, test.src.account, test.src.amount)
+			err = e.Credit(ctx, test.src.account, test.src.amount)
 			require.Equal(t, test.dst.err, err)
 			if err != nil {
 				return
@@ -145,16 +79,12 @@ INSERT INTO account SET id = 1;`
 			amount, err := getAccount(db, test.src.account)
 			require.NoError(t, err)
 			assert.Equal(t, test.dst.amount, amount)
-			assert.Equal(t, test.src.account, history.account)
-			assert.Equal(t, test.src.uid, history.uid)
-			assert.Equal(t, test.src.amount, history.amount)
 		})
 	}
 }
 
 func TestEngine_Debit(t *testing.T) {
 	type Src struct {
-		uid     int64
 		account uint32
 		amount  float32
 		source  float32
@@ -173,7 +103,6 @@ func TestEngine_Debit(t *testing.T) {
 	tests := map[string]Test{
 		"Valid payment must be accepted": {
 			src: Src{
-				uid:     10,
 				account: 1,
 				amount:  50,
 				source:  100,
@@ -184,7 +113,6 @@ func TestEngine_Debit(t *testing.T) {
 		},
 		"Invalid payer must be skipped": {
 			src: Src{
-				uid:     10,
 				account: 2,
 				amount:  50,
 				source:  100,
@@ -198,9 +126,7 @@ func TestEngine_Debit(t *testing.T) {
 	ctx, db := setUp()
 	defer db.Close(ctx)
 
-	assets := &assetMock{}
-	history := &historyMock{}
-	e := New(db, assets, history)
+	e := New(db)
 
 	const query = `
 DELETE FROM account;
@@ -213,7 +139,7 @@ INSERT INTO account SET id = 1;`
 			const query = "UPDATE account SET amount = ?"
 			_, err := db.Exec(query, test.src.source)
 			require.NoError(t, err)
-			err = e.Debit(ctx, test.src.uid, test.src.account, test.src.amount)
+			err = e.Debit(ctx, test.src.account, test.src.amount)
 			require.Equal(t, test.dst.err, err)
 			if err != nil {
 				return
@@ -222,9 +148,6 @@ INSERT INTO account SET id = 1;`
 			amount, err := getAccount(db, test.src.account)
 			require.NoError(t, err)
 			assert.Equal(t, test.dst.amount, amount)
-			assert.Equal(t, test.src.account, history.account)
-			assert.Equal(t, test.src.uid, history.uid)
-			assert.Equal(t, test.src.amount, history.amount)
 		})
 	}
 }
