@@ -20,23 +20,14 @@ func (engine *engine) Credit(
 	account uint32,
 	amount float32,
 ) error {
-	return engine.Transaction(
+	return engine.upgrade(
 		ctx,
-		func(ctx context.Context, scope sql.Scope) error {
-			const query1 = "SELECT amount FROM account WHERE id = ? FOR UPDATE"
-			var sum float32
-			err := scope.QueryRow(query1, account).Scan(&sum)
-			if err != nil {
-				return err
-			}
-
+		account,
+		func(sum float32) (float32, error) {
 			if sum < amount {
-				return domain.ErrNoMoney
+				return 0, domain.ErrNoMoney
 			}
-
-			const query2 = "UPDATE account SET amount = ? WHERE id = ?"
-			_, err = scope.Exec(query2, sum-amount, account)
-			return err
+			return sum - amount, nil
 		},
 	)
 }
@@ -45,6 +36,20 @@ func (engine *engine) Debit(
 	ctx context.Context,
 	account uint32,
 	amount float32,
+) error {
+	return engine.upgrade(
+		ctx,
+		account,
+		func(sum float32) (float32, error) {
+			return sum + amount, nil
+		},
+	)
+}
+
+func (engine *engine) upgrade(
+	ctx context.Context,
+	account uint32,
+	action func(sum float32) (float32, error),
 ) error {
 	return engine.Transaction(
 		ctx,
@@ -56,8 +61,13 @@ func (engine *engine) Debit(
 				return err
 			}
 
+			res, err := action(sum)
+			if err != nil {
+				return err
+			}
+
 			const query2 = "UPDATE account SET amount = ? WHERE id = ?"
-			_, err = scope.Exec(query2, sum+amount, account)
+			_, err = scope.Exec(query2, res, account)
 			return err
 		},
 	)
