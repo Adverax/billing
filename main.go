@@ -2,6 +2,7 @@ package main
 
 import (
 	"billing/domain"
+	"billing/manager/account"
 	"billing/manager/asset"
 	"billing/manager/banker"
 	"billing/manager/history"
@@ -24,6 +25,7 @@ func main() {
 		ctx,
 		banker.New(
 			db,
+			account.New(db),
 			asset.New(db),
 			history.New(db),
 		),
