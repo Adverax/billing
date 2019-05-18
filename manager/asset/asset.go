@@ -42,7 +42,7 @@ func (engine *engine) Remove(
 	err = engine.Transaction(
 		ctx,
 		func(ctx context.Context, scope sql.Scope) error {
-			const query1 = "SELECT id, amount FROM asset WHERE uid = ? AND account = ?"
+			const query1 = "SELECT id, amount FROM asset WHERE uid = ? AND account = ? FOR UPDATE"
 			var id int64
 			err := scope.QueryRow(query1, uid, account).Scan(&id, &amount)
 			if err != nil {
