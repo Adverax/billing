@@ -2,12 +2,10 @@ package domain
 
 import (
 	"github.com/BurntSushi/toml"
+	"github.com/adverax/echo/database/sql"
 	"os"
 	"path/filepath"
 	"regexp"
-
-	"github.com/adverax/echo/database/sql"
-	"swf/pkg/domain"
 )
 
 const (
@@ -43,7 +41,7 @@ var (
 	Config = Configuration{
 		Database: DatabaseOptions{
 			Heartbeat: 60,
-			DbId:      domain.DatabaseCore,
+			DbId:      1,
 		},
 		Broker: BrokerOptions{
 			Server: "nats://localhost:4222",
