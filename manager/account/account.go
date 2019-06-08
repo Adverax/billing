@@ -53,7 +53,9 @@ func (engine *engine) upgrade(
 ) error {
 	return engine.Transaction(
 		ctx,
-		func(ctx context.Context, scope sql.Scope) error {
+		func(ctx context.Context) error {
+			scope := engine.Scope(ctx)
+
 			const query1 = "SELECT amount FROM account WHERE id = ? FOR UPDATE"
 			var sum float32
 			err := scope.QueryRow(query1, account).Scan(&sum)

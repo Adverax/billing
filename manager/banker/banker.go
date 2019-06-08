@@ -44,7 +44,7 @@ func (engine *engine) Credit(
 ) error {
 	return engine.Transaction(
 		ctx,
-		func(ctx context.Context, scope sql.Scope) error {
+		func(ctx context.Context) error {
 			err := engine.history.Append(ctx, uid, account, amount, domain.OperationCredit)
 			if err != nil {
 				return err
@@ -63,7 +63,7 @@ func (engine *engine) Debit(
 ) error {
 	return engine.Transaction(
 		ctx,
-		func(ctx context.Context, scope sql.Scope) error {
+		func(ctx context.Context) error {
 			err := engine.history.Append(ctx, uid, account, amount, domain.OperationDebit)
 			if err != nil {
 				return err
@@ -82,7 +82,7 @@ func (engine *engine) Transfer(
 ) error {
 	return engine.Transaction(
 		ctx,
-		func(ctx context.Context, scope sql.Scope) error {
+		func(ctx context.Context) error {
 			err := engine.history.Append(ctx, uid, src, amount, domain.OperationTransferSrc)
 			if err != nil {
 				return err
@@ -111,7 +111,7 @@ func (engine *engine) Acquire(
 ) error {
 	return engine.Transaction(
 		ctx,
-		func(ctx context.Context, scope sql.Scope) error {
+		func(ctx context.Context) error {
 			err := engine.history.Append(ctx, uid, account, amount, domain.OperationAcquire)
 			if err != nil {
 				return err
@@ -134,7 +134,7 @@ func (engine *engine) Commit(
 ) error {
 	return engine.Transaction(
 		ctx,
-		func(ctx context.Context, scope sql.Scope) error {
+		func(ctx context.Context) error {
 			amount, err := engine.assets.Remove(ctx, uid, account)
 			if err != nil {
 				return err
@@ -152,7 +152,7 @@ func (engine *engine) Rollback(
 ) error {
 	return engine.Transaction(
 		ctx,
-		func(ctx context.Context, scope sql.Scope) error {
+		func(ctx context.Context) error {
 			amount, err := engine.assets.Remove(ctx, uid, account)
 			if err != nil {
 				return err
